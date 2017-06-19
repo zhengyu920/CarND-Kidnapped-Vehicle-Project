@@ -19,8 +19,12 @@
 
 using namespace std;
 
+// helper functions
+// given two landmarks calculate their distance
 double landmarkDist(LandmarkObs* a, LandmarkObs* b);
+// give a particle and a observation in car coordinate, return transformed observation in map coordinate wrt the particle
 LandmarkObs transform(LandmarkObs& obs, Particle p);
+// return value of multivarate gaussian
 double gaussian(double x[], double miu[], double sigma[]);
 
 void ParticleFilter::init(double x, double y, double theta, double std[]) {
@@ -31,7 +35,7 @@ void ParticleFilter::init(double x, double y, double theta, double std[]) {
 	// NOTE: Consult particle_filter.h for more information about this method (and others in this file).
 
     // set number of particles
-    num_particles = 1000;
+    num_particles = 20;
     // sample from gaussian distribution of x, y and theta as init value
     double sigma_x = std[0];
     double sigma_y = std[1];
@@ -69,11 +73,11 @@ void ParticleFilter::prediction(double delta_t, double std_pos[], double velocit
     normal_distribution<double> dist_x_noise {0, sigma_x};
     normal_distribution<double> dist_y_noise {0, sigma_y};
     normal_distribution<double> dist_theta_noise {0, sigma_theta};
-    if (yaw_rate < 0.0001) {
+    if (abs(yaw_rate) < 0.0000001) {
         for (int i = 0; i < num_particles; i++) {
             double x_noise = dist_x_noise(gen);
             double y_noise = dist_y_noise(gen);
-            Particle p = particles[i];
+            Particle& p = particles[i];
             p.x += delta_t * velocity * cos(p.theta) + x_noise;
             p.y += delta_t * velocity * sin(p.theta) + y_noise;
         }
@@ -81,10 +85,10 @@ void ParticleFilter::prediction(double delta_t, double std_pos[], double velocit
         for (int i = 0; i < num_particles; i++) {
             double x_noise = dist_x_noise(gen);
             double y_noise = dist_y_noise(gen);
-            Particle p = particles[i];
-            p.x += (velocity / yaw_rate) * (sin(p.theta + yaw_rate * delta_t) - sin(p.theta)) + x_noise;
-            p.y += (velocity / yaw_rate) * (cos(p.theta) - cos(p.theta + yaw_rate * delta_t)) + y_noise;
-            p.theta += yaw_rate * delta_t;
+            Particle& p = particles[i];
+            p.x = p.x + (velocity / yaw_rate) * (sin(p.theta + yaw_rate * delta_t) - sin(p.theta)) + x_noise;
+            p.y = p.y + (velocity / yaw_rate) * (cos(p.theta) - cos(p.theta + yaw_rate * delta_t)) + y_noise;
+            p.theta = p.theta + yaw_rate * delta_t;
         }
     }
 }
@@ -128,10 +132,9 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 	//   and the following is a good resource for the actual equation to implement (look at equation 
 	//   3.33
 	//   http://planning.cs.uiuc.edu/node99.html
-//    double sigma_x = std_landmark[0];
-//    double sigma_y = std_landmark[1];
+
     for (int i = 0; i < num_particles; i++) {
-        Particle p = particles[i];
+        Particle& p = particles[i]; // reference to the particle
         std::vector<LandmarkObs> tobs;
         // transform each observations
         for (int i = 0; i < observations.size(); i++) {
@@ -172,7 +175,7 @@ void ParticleFilter::resample() {
     vector<Particle> new_particles;
     for (int i = 0; i < num_particles; i++) {
         Particle p = particles[d(gen)];
-        Particle new_p {p.id, p.x, p.y, p.theta, 1};
+        Particle new_p {p.id, p.x, p.y, p.theta, p.weight};
         new_particles.push_back(new_p);
     }
     particles = new_particles;
